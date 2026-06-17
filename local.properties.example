@@ -1,0 +1,6 @@
+# Signing credentials template
+# Copy this file to local.properties and fill in your actual values
+release.keystore.path=/path/to/your/keystore.jks
+release.keystore.password=your_password
+release.key.alias=your_alias
+release.key.password=your_password

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,6 +9,24 @@ plugins {
 android {
     namespace = "com.example.myappsettings"
     compileSdk = 35
+
+    // Load signing properties from local.properties
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            // Read from local.properties or use placeholders
+            val keystorePath = localProperties.getProperty("release.keystore.path") ?: ""
+            storeFile = if (keystorePath.isNotEmpty()) file(keystorePath) else null
+            storePassword = localProperties.getProperty("release.keystore.password") ?: ""
+            keyAlias = localProperties.getProperty("release.key.alias") ?: ""
+            keyPassword = localProperties.getProperty("release.key.password") ?: ""
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.myappsettings"
@@ -20,6 +41,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Only use signingConfig if the keystore file exists
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile?.exists() == true) {
+                signingConfig = releaseConfig
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

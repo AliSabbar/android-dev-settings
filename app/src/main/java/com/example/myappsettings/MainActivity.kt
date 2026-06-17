@@ -10,7 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -49,6 +52,7 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val contentResolver = context.contentResolver
     val clipboardManager = LocalClipboardManager.current
+    val scrollState = rememberScrollState()
 
     // Helper functions to check actual system state
     fun isUsbDebuggingEnabled(): Boolean =
@@ -57,13 +61,18 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
     fun isDeveloperOptionsEnabled(): Boolean =
         Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
 
+    fun isWirelessDebuggingEnabled(): Boolean =
+        Settings.Global.getInt(contentResolver, "adb_wifi_enabled", 0) == 1
+
     // State variables
     var usbDebuggingEnabled by remember { mutableStateOf(isUsbDebuggingEnabled()) }
     var developerOptionsEnabled by remember { mutableStateOf(isDeveloperOptionsEnabled()) }
+    var wirelessDebuggingEnabled by remember { mutableStateOf(isWirelessDebuggingEnabled()) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
@@ -108,17 +117,32 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
             }
         )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Wireless Debugging Toggle
+        SettingsRow(
+            label = "Wireless Debugging",
+            subtitle = if (wirelessDebuggingEnabled) "Enabled" else "Disabled",
+            checked = wirelessDebuggingEnabled,
+            onCheckedChange = { checked ->
+                try {
+                    Settings.Global.putInt(contentResolver, "adb_wifi_enabled", if (checked) 1 else 0)
+                    wirelessDebuggingEnabled = checked
+                } catch (_: SecurityException) {
+                    showPermissionError(context)
+                }
+            }
+        )
+
         Spacer(modifier = Modifier.height(32.dp))
 
-        // MODIFIED: Developer Options Button
+        // Developer Options Button
         Button(
             onClick = {
                 try {
-                    // Try to open general Developer Options Directly
                     val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    // Fallback to general settings or show error
                     try {
                         val fallbackIntent = Intent(Settings.ACTION_SETTINGS)
                         context.startActivity(fallbackIntent)
@@ -133,7 +157,11 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
             Text("Open Developer Options")
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(24.dp))
+
+
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- Instruction Card with Copy Button ---
         val adbCommand = "adb -s <your_device_id> shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
@@ -146,7 +174,7 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "⚠️ First-Time Setup",
+                    text = "⚠️ ADB Permission",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -155,17 +183,7 @@ fun DevToggleScreen(modifier: Modifier = Modifier) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "1. Plug phone into computer.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "2. Run 'adb devices' in terminal.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "3. Replace <your_device_id> in the command below and run it:",
+                    text = "Run this command to allow the toggles to work:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -240,7 +258,7 @@ fun SettingsRow(
 private fun showPermissionError(context: Context) {
     Toast.makeText(
         context,
-        "Permission Denied! Use ADB to grant WRITE_SECURE_SETTINGS.",
+        "Permission Denied! Check ADB and Xiaomi Security settings.",
         Toast.LENGTH_LONG
     ).show()
 }
